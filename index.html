@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+<!--
+CHANGELOG v3
+1. NEW fixed MAIN event (edit the MAIN constant in the script to change it for everyone).
+   Date/time cannot be changed or deleted by visitors.
+2. Visitors can rename the main event title (pencil button). Saved ONLY on their own device.
+3. Default "My special day" removed; old saved copy is cleaned up automatically.
+4. Main event is pinned on top with a "Main" tag; visitors can still add private extra days
+   (set ALLOW_EXTRA = false to turn this off).
+5. Shared links (v2 behaviour) unchanged: view-only by default, &edit=1 lets viewers add days.
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -23,9 +33,11 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 h1{font-size:15px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 button{font:inherit;color:inherit;border:0;cursor:pointer}
 .icon{width:38px;height:38px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:16px}
+.hbtns{display:flex;gap:8px}
 .hero{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:26px 22px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
 .emoji{font-size:44px}
 .title{font-size:24px;font-weight:700;margin:6px 0 2px}
+.pen{background:none;font-size:16px;color:var(--mute);margin-left:6px;vertical-align:middle;padding:4px}
 .date{color:var(--mute);font-size:13px}
 .ring{position:relative;width:220px;height:220px;margin:22px auto 18px}
 .ring svg{transform:rotate(-90deg)}
@@ -37,6 +49,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .t b{display:block;font-size:26px;font-variant-numeric:tabular-nums;font-weight:700}
 .t span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 .done .big{background:linear-gradient(135deg,#facc15,var(--c));-webkit-background-clip:text;background-clip:text}
+.mk{display:block;margin-top:18px;padding:14px;border-radius:14px;font-weight:600;text-decoration:none;color:#fff;background:linear-gradient(135deg,var(--a),var(--c))}
 h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:26px 4px 10px}
 .item{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
 .item.on{border-color:var(--a);box-shadow:0 0 0 1px var(--a) inset}
@@ -44,6 +57,7 @@ h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .item .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .item .d{font-size:12px;color:var(--mute)}
 .item .x{background:none;color:var(--mute);font-size:18px;padding:6px}
+.tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--b);border:1px solid var(--b);border-radius:8px;padding:3px 7px}
 .fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:58px;height:58px;border-radius:20px;font-size:28px;color:#fff;background:linear-gradient(135deg,var(--a),var(--c));box-shadow:0 10px 30px rgba(124,92,255,.5)}
 dialog{border:1px solid var(--line);border-radius:26px;background:var(--bg);color:var(--tx);width:min(92vw,420px);padding:22px;margin:auto}
 dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
@@ -51,6 +65,9 @@ dialog h3{margin-bottom:14px}
 label{display:block;font-size:12px;color:var(--mute);margin:12px 0 6px}
 input{width:100%;font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px;color-scheme:dark}
 :root[data-theme=light] input{color-scheme:light}
+label.chk{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--tx);margin:14px 0}
+label.chk input{width:20px;height:20px;padding:0}
+.hint{font-size:12px;color:var(--mute);margin-top:6px}
 .emojis{display:flex;gap:8px;flex-wrap:wrap}
 .emojis button{width:42px;height:42px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:20px}
 .emojis button.s{border-color:var(--a);background:rgba(124,92,255,.25)}
@@ -62,9 +79,9 @@ input{width:100%;font:inherit;color:var(--tx);background:var(--card);border:1px 
 </head>
 <body>
 <div class="wrap">
-  <header><h1>Countdown</h1><button class="icon" id="theme" aria-label="Theme">🌗</button></header>
+  <header><h1>Countdown</h1><div class="hbtns"><button class="icon" id="shr" aria-label="Share">🔗</button><button class="icon" id="theme" aria-label="Theme">🌗</button></div></header>
   <div id="hero"></div>
-  <h2>Your days</h2>
+  <h2 id="lh">Your days</h2>
   <div id="list"></div>
 </div>
 <button class="fab" id="add" aria-label="Add">+</button>
@@ -78,42 +95,89 @@ input{width:100%;font:inherit;color:var(--tx);background:var(--card);border:1px 
   <div class="row"><button id="cancel">Cancel</button><button class="go" id="save">Save</button></div>
 </dialog>
 
+<dialog id="edlg">
+  <h3>Rename this day</h3>
+  <label>Title</label><input id="etitle" maxlength="40">
+  <p class="hint">The date and time are fixed. Your title is saved only on this device.</p>
+  <div class="row"><button id="ecancel">Cancel</button><button id="ereset">Reset</button><button class="go" id="esave">Save</button></div>
+</dialog>
+
+<dialog id="sdlg">
+  <h3>Share this countdown</h3>
+  <label class="chk"><input type="checkbox" id="edt"> Let viewers add their own days</label>
+  <input id="lnk" readonly>
+  <p class="hint" id="hint">Viewers will only see this event (view-only).</p>
+  <div class="row"><button id="sclose">Close</button><button id="scopy" class="go">Copy link</button></div>
+  <div class="row" id="snrow" style="display:none"><button id="snative">Share via…</button></div>
+</dialog>
+
 <script>
+/* ===== CONFIG: the fixed public event (edit here to change it for everyone) ===== */
+const MAIN={id:'main',name:'A Big Day...',emoji:'✈️',
+  ts:Date.parse('2026-12-16T01:00:00+05:30'),      // fixed moment (IST); shows in each viewer's local time
+  created:Date.parse('2026-09-30T00:00:00+05:30')}; // start point for the progress ring
+const ALLOW_EXTRA=true; // true = visitors may add their own private extra days; false = only the main event
+/* ================================================================================ */
+
 const $=s=>document.querySelector(s), pad=n=>String(n).padStart(2,'0');
 const EM=['🎉','🎂','✈️','💍','🎓','🎄','❤️','🚀'];
-let ev=[],sel=null,pick=EM[0];
-try{ev=JSON.parse(localStorage.getItem('cd_ev')||'[]');sel=localStorage.getItem('cd_sel');
+let ev=[],sel=null,pick=EM[0],myTitle='';
+try{ev=JSON.parse(localStorage.getItem('cd_ev')||'[]');sel=localStorage.getItem('cd_sel');myTitle=localStorage.getItem('cd_mt')||'';
  const th=localStorage.getItem('cd_th');if(th)document.documentElement.dataset.theme=th}catch(e){}
+ev=ev.filter(e=>!(e.id==='1'&&e.name==='My special day')); // remove old default
 const save=()=>{try{localStorage.setItem('cd_ev',JSON.stringify(ev));localStorage.setItem('cd_sel',sel||'')}catch(e){}};
-if(!ev.length){const d=new Date();d.setDate(d.getDate()+30);ev=[{id:'1',name:'My special day',emoji:'🎉',ts:d.setHours(0,0,0,0),created:Date.now()}];sel='1'}
-if(!ev.find(e=>e.id===sel))sel=ev[0].id;
 
+/* ---- Shared link handling ---- */
+const q=new URLSearchParams(location.search);
+let sh=null;
+{const t=Number(q.get('t'))||(q.get('date')?new Date(q.get('date')+'T'+(q.get('time')||'00:00')).getTime():NaN);
+ if(t&&!isNaN(t))sh={id:'shared',name:(q.get('name')||'Special day').slice(0,40),emoji:(q.get('emoji')||'🎉').slice(0,8),ts:t,created:Number(q.get('c'))||t-30*864e5}}
+const canAdd=sh?q.get('edit')==='1':ALLOW_EXTRA;
+const viewOnly=!!sh&&!canAdd;
+const pinnedId=sh?'shared':'main';
+const mainEv=()=>({...MAIN,name:myTitle||MAIN.name});
+const pinned=()=>sh||mainEv();
+const get=id=>id==='shared'?sh:id==='main'?(sh?null:mainEv()):ev.find(x=>x.id===id);
+if(sh)document.title=sh.name+' · Countdown';
+if(!get(sel))sel=pinnedId; if(sh)sel='shared';
+
+function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function render(){
-  const e=ev.find(x=>x.id===sel),now=Date.now(),diff=e.ts-now,past=diff<=0,ms=Math.abs(diff);
+  const e=get(sel)||pinned(),now=Date.now(),diff=e.ts-now,past=diff<=0,ms=Math.abs(diff);
   const d=Math.floor(ms/864e5),h=Math.floor(ms/36e5%24),m=Math.floor(ms/6e4%60),s=Math.floor(ms/1e3%60);
   const totalH=Math.floor(ms/36e5),pct=past?1:Math.min(1,Math.max(0,(now-e.created)/(e.ts-e.created)));
   const R=100,C=2*Math.PI*R;
   $('#hero').innerHTML=`<div class="hero ${past?'done':''}">
-   <div class="emoji">${e.emoji}</div><div class="title">${esc(e.name)}</div>
+   <div class="emoji">${esc(e.emoji)}</div><div class="title">${esc(e.name)}${e.id==='main'?'<button class="pen" id="pen" aria-label="Rename">✎</button>':''}</div>
    <div class="date">${new Date(e.ts).toLocaleString([],{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
    <div class="ring"><svg width="220" height="220"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#7c5cff"/><stop offset="1" stop-color="#ff5ca8"/></linearGradient></defs>
     <circle cx="110" cy="110" r="${R}" fill="none" stroke="var(--line)" stroke-width="12"/>
     <circle cx="110" cy="110" r="${R}" fill="none" stroke="url(#g)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}"/></svg>
     <div class="in"><div class="big">${past?'🎊':totalH.toLocaleString()}</div><div class="lbl">${past?'It\'s here! '+d+'d ago':'hours left'}</div></div></div>
-   <div class="grid"><div class="t"><b>${d}</b><span>Days</span></div><div class="t"><b>${pad(h)}</b><span>Hours</span></div><div class="t"><b>${pad(m)}</b><span>Min</span></div><div class="t"><b>${pad(s)}</b><span>Sec</span></div></div></div>`;
+   <div class="grid"><div class="t"><b>${d}</b><span>Days</span></div><div class="t"><b>${pad(h)}</b><span>Hours</span></div><div class="t"><b>${pad(m)}</b><span>Min</span></div><div class="t"><b>${pad(s)}</b><span>Sec</span></div></div>
+   ${viewOnly?`<a class="mk" href="${location.pathname}">✨ Create your own countdown</a>`:''}</div>`;
 }
-function esc(t){return t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function renderList(){
-  const now=Date.now();
-  $('#list').innerHTML=ev.length?ev.slice().sort((a,b)=>a.ts-b.ts).map(e=>{
-    const dd=Math.ceil((e.ts-now)/864e5);
-    return `<div class="item ${e.id===sel?'on':''}" data-id="${e.id}"><span class="e">${e.emoji}</span><div class="m"><div class="n">${esc(e.name)}</div><div class="d">${new Date(e.ts).toLocaleDateString()} · ${dd>0?dd+' days':'passed'}</div></div><button class="x" data-del="${e.id}" aria-label="Delete">✕</button></div>`}).join(''):'<div class="empty">No days yet. Tap + to add one.</div>';
+  if(viewOnly||(!sh&&!ALLOW_EXTRA)){$('#list').innerHTML='';$('#lh').style.display='none';return}
+  const now=Date.now(),own=ev.slice().sort((a,b)=>a.ts-b.ts),all=[pinned(),...own];
+  $('#list').innerHTML=all.map(e=>{
+    const dd=Math.ceil((e.ts-now)/864e5),fixed=e.id==='shared'||e.id==='main';
+    return `<div class="item ${e.id===sel?'on':''}" data-id="${e.id}"><span class="e">${esc(e.emoji)}</span><div class="m"><div class="n">${esc(e.name)}</div><div class="d">${new Date(e.ts).toLocaleDateString()} · ${dd>0?dd+' days':'passed'}</div></div>${fixed?`<span class="tag">${e.id==='main'?'Main':'Shared'}</span>`:`<button class="x" data-del="${e.id}" aria-label="Delete">✕</button>`}</div>`}).join('');
 }
 $('#list').onclick=x=>{
   const del=x.target.dataset.del;
-  if(del){ev=ev.filter(e=>e.id!==del);if(!ev.length){location.reload();return}if(sel===del)sel=ev[0].id;save();renderList();render();return}
+  if(del){ev=ev.filter(e=>e.id!==del);if(sel===del)sel=pinnedId;save();renderList();render();return}
   const it=x.target.closest('.item');if(it){sel=it.dataset.id;save();renderList();render();scrollTo({top:0,behavior:'smooth'})}
 };
+
+/* ---- Rename main title (device-only) ---- */
+$('#hero').onclick=x=>{if(x.target.closest('#pen')){$('#etitle').value=myTitle||MAIN.name;$('#edlg').showModal()}};
+$('#ecancel').onclick=()=>$('#edlg').close();
+const setTitle=v=>{myTitle=v;try{v?localStorage.setItem('cd_mt',v):localStorage.removeItem('cd_mt')}catch(e){}$('#edlg').close();renderList();render()};
+$('#esave').onclick=()=>{const v=$('#etitle').value.trim();setTitle(v&&v!==MAIN.name?v:'')};
+$('#ereset').onclick=()=>setTitle('');
+
+/* ---- Add own days ---- */
 $('#emojis').innerHTML=EM.map((e,i)=>`<button data-e="${e}" class="${i?'':'s'}">${e}</button>`).join('');
 $('#emojis').onclick=x=>{const b=x.target.closest('button');if(!b)return;pick=b.dataset.e;[...$('#emojis').children].forEach(c=>c.classList.toggle('s',c===b))};
 $('#add').onclick=()=>{$('#name').value='';$('#date').value='';$('#date').min=new Date().toISOString().slice(0,10);$('#dlg').showModal()};
@@ -125,6 +189,31 @@ $('#save').onclick=()=>{
   ev.push(e);sel=e.id;save();$('#dlg').close();renderList();render();
 };
 $('#theme').onclick=()=>{const r=document.documentElement,t=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=t;try{localStorage.setItem('cd_th',t)}catch(e){}};
+
+/* ---- Share ---- */
+function makeLink(e,edit){
+  const u=new URL(location.origin+location.pathname);
+  u.searchParams.set('t',e.ts);u.searchParams.set('name',e.name);u.searchParams.set('emoji',e.emoji);u.searchParams.set('c',e.created);
+  if(edit)u.searchParams.set('edit','1');return u.toString();
+}
+function updLink(){
+  const e=get(sel)||pinned(),on=$('#edt').checked;
+  $('#lnk').value=makeLink(e,on);
+  $('#hint').textContent=on?'Viewers see this event pinned, and can add their own private days.':'Viewers will only see this event (view-only).';
+}
+$('#shr').onclick=()=>{$('#edt').checked=false;$('#snrow').style.display=navigator.share?'flex':'none';updLink();$('#sdlg').showModal()};
+$('#edt').onchange=updLink;
+$('#sclose').onclick=()=>$('#sdlg').close();
+$('#scopy').onclick=async()=>{
+  const l=$('#lnk').value;
+  try{await navigator.clipboard.writeText(l)}catch(e){$('#lnk').select();document.execCommand('copy')}
+  $('#scopy').textContent='Copied ✓';setTimeout(()=>$('#scopy').textContent='Copy link',1500);
+};
+$('#snative').onclick=()=>{const e=get(sel)||pinned();navigator.share({title:e.name,text:e.name+' countdown',url:$('#lnk').value}).catch(()=>{})};
+
+/* ---- Init ---- */
+if(!canAdd)$('#add').style.display='none';
+if(viewOnly)$('#shr').style.display='none';
 save();renderList();render();setInterval(render,1000);setInterval(renderList,60000);
 </script>
 </body>
